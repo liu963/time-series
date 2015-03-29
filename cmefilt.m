@@ -1,37 +1,38 @@
-function [TSf, CME, m] = cmefilt(TS,TS2,type,nw)
+function [TSf, CME, m] = cmefilt(TS,TS2,type,nw,verbose)
 % [TSf, CME, m] = cmefilt(TS,TS2,nw)
 %
 % Remove common-mode errors (CME) in GPS time series.
 %
 % Input:
 %   TS, TS2 are cell arrays with the following fields:
-%        TS{i}.t = time vector of ith station
-%        TS{i}.site = site id (string) of ith station
+%        TS{i}.t        = time vector of ith station
+%        TS{i}.site     = site id (string) of ith station
 %        TS{i}.apcoords = a priori XYZ coordinates (3 x 1 vector)
 %        TS{i}.X, TS{i}.Y, TS{i}.Z = X, Y, and Z coordinate time series
-%        TS{i}.e, TS{i}.n, TS{i}.u = east, north, up time series
-%   TS should contain time series from *fiducial stations* (stations used to
-%   estimate daily Helmert parameters).
-%   TS2 should contain time series from *stations of interest* (stations upon
-%   which the CME filter will be applied).
+%    * TS should contain time series from *fiducial stations* (stations used to
+%        estimate Helmert parameters for each epoch).
+%    * TS2 should contain time series from *stations of interest* (stations upon
+%        which the CME filter will be applied).
 %   type = 'median' for median filter detrending, or
 %          'lowpass' for low-pass filter detrending
 %   nw   = window length (in days) if doing median filter, or
 %          normalized cutoff frequency (from 0 to 1) if doing low-pass
 %          filter
+%
 % Output:
 %    TSf = cell array of filtered (CME removed) time series of stations of
 %          interest, with the same structure as TS2.
 %    CME = cell array of CME time series alone of stations of interest.
 %          Same structure as TS2.
-%    m   = 7 x Nt vector of global daily Helmert parameters (3
-%          translations, 3 rotations, 1 scale), Nt = number of unique
+%    m   = (7 x Nt) vector of global Helmert parameters for each epoch (3
+%          translations, 3 rotations, 1 scale), where Nt = number of unique
 %          epochs
 %
 % Andreas Mavrommatis, 2013.
 
-
-verbose = 1;
+if nargin < 5
+    verbose = 1;
+end
 
 % ------------------------------------------------------------------------
 % STEP 1: Detrend raw XYZ time series of fiducial stations
@@ -82,7 +83,7 @@ for i = 1:Ns;
     TS{i}.Z2(2*Nt+1:3*Nt) = TS{i}.Zr;
 end
 
-% Run and subtract median filter from time series of fiducial sites
+% Run and subtract median or low-pass filter from time series of fiducial sites
 
 if strcmp(type,'lowpass'),
     Wn = nw;
@@ -94,7 +95,7 @@ for i = 1:Ns
     if strcmp(type,'median'),
         TS{i}.X2f = medfilt1(TS{i}.X2,nw); % Median filter of extended time series
     elseif strcmp(type,'lowpass')
-        TS{i}.X2f = lpfilter2(TS{i}.X2,Wn,0); % Low pass of extended time series
+        TS{i}.X2f = lpfilter(TS{i}.X2,Wn,0); % Low pass of extended time series
     end
     TS{i}.Xf = TS{i}.X2f(Nt+1:2*Nt); % Extract median filter for original ts
     TS{i}.Xd = TS{i}.X' - TS{i}.Xf; % Detrend by subtracting median filter
@@ -102,7 +103,7 @@ for i = 1:Ns
     if strcmp(type,'median'),
         TS{i}.Y2f = medfilt1(TS{i}.Y2,nw);
     elseif strcmp(type,'lowpass')
-        TS{i}.Y2f = lpfilter2(TS{i}.Y2,Wn,0); % Low pass of extended time series
+        TS{i}.Y2f = lpfilter(TS{i}.Y2,Wn,0); % Low pass of extended time series
     end
     TS{i}.Yf = TS{i}.Y2f(Nt+1:2*Nt);
     TS{i}.Yd = TS{i}.Y' - TS{i}.Yf;
@@ -110,39 +111,13 @@ for i = 1:Ns
     if strcmp(type,'median'),
         TS{i}.Z2f = medfilt1(TS{i}.Z2,nw);
     elseif strcmp(type,'lowpass')
-        TS{i}.Z2f = lpfilter2(TS{i}.Z2,Wn,0); % Low pass of extended time series
+        TS{i}.Z2f = lpfilter(TS{i}.Z2,Wn,0); % Low pass of extended time series
     end
     TS{i}.Zf = TS{i}.Z2f(Nt+1:2*Nt);
     TS{i}.Zd = TS{i}.Z' - TS{i}.Zf;
 end
 
 
-if 1
-    figure
-    for i = 1:length(TS)
-        subplot(4,3,i)
-        plot(TS{i}.t,TS{i}.X,TS{i}.t,TS{i}.Xf,'r')
-        plot(TS{i}.t,TS{i}.X - TS{i}.Xf')
-        label('','X')
-        axis tight; title(num2str(TS{i}.site));
-    end
-    figure
-    for i = 1:length(TS)
-        subplot(4,3,i)
-        plot(TS{i}.t,TS{i}.Y,TS{i}.t,TS{i}.Yf,'r')
-        plot(TS{i}.t,TS{i}.Y - TS{i}.Yf')
-        label('','Y')
-        axis tight; title(num2str(TS{i}.site));
-    end
-    figure
-    for i = 1:length(TS)
-        subplot(4,3,i)
-        plot(TS{i}.t,TS{i}.Z,TS{i}.t,TS{i}.Zf,'r')
-        plot(TS{i}.t,TS{i}.Z - TS{i}.Zf')
-        label('','Z')
-        axis tight; title(num2str(TS{i}.site));
-    end
-end
 
 % ------------------------------------------------------------------------
 % STEP 2: Estimate global daily Helmert parameters from fiducial stations
@@ -183,9 +158,9 @@ end
 if verbose, disp('Helmert parameter estimation done.'); end
 
 
-% ------------------------------------------------------------------------
-% STEP 3: Apply daily Helmert transformations to stations of interest
-% ------------------------------------------------------------------------
+% --------------------------------------------------------------------------
+% STEP 3: Apply Helmert transformation on each epoch to stations of interest
+% --------------------------------------------------------------------------
 
 % For each station of interest, see if the station contains the current
 % unique epoch. If yes, compute predicted common-mode position for that
@@ -247,32 +222,6 @@ for i = 1:Ns2
     
 end
 
-% ------------------------------------------------------------------------
-% STEP 4: Transform from XYZ to ENU
-% ------------------------------------------------------------------------
-
-if verbose,
-    disp('Transforming to ENU...');
-end
-
-for i = 1:Ns2
-    XYZf = [TSf{i}.X'; TSf{i}.Y'; TSf{i}.Z'];
-    CME_XYZ = [CME{i}.X'; CME{i}.Y'; CME{i}.Z'];
-    
-    XYZ = reshape(XYZf,3*length(TS2{i}.t),1);
-    CMEXYZ = reshape(CME_XYZ,3*length(TS2{i}.t),1);
-    origin = xyz2llh([TS2{i}.apcoords]);
-    ENU = xyz2enu(XYZ,[],[origin(1) origin(2)]);
-    CME_ENU = xyz2enu(CMEXYZ,[],[origin(1) origin(2)]);
-    
-    TSf{i}.e = ENU(1:3:end);
-    TSf{i}.n = ENU(2:3:end);
-    TSf{i}.u = ENU(3:3:end);
-    
-    CME{i}.e = CME_ENU(1:3:end);
-    CME{i}.n = CME_ENU(2:3:end);
-    CME{i}.u = CME_ENU(3:3:end);
-end
 
 if verbose, disp('All done!'); end
 
@@ -303,4 +252,20 @@ end
 
 H = [XYZ repmat(eye(3),Nsta,1) R];
 % scale    translation     rotation
+
+end
+
+% ------------------------------------------------------------------------
+
+function xf = lpfilter(x,Wn)
+% xf = lpfilter2(x,Fs,Fc)
+% 
+% Low-pass filter.
+% Inputs: x = data vector
+%         Wn = normalized cutoff frequency (between 0 and 1, where 1
+%         corresponds to the Nyquist frequency)
+
+[B,A] = butter(1,Wn);   % Butterworth filter
+xf = filtfilt(B,A,x);
+
 end
