@@ -8,4 +8,4 @@ Code for removing common-mode error in GPS time series. Common mode is error tha
 
 ### `fitTS.m` GPS time series trend estimation
 
-Code for fitting horizontal GPS displacement time series for secular (linear + quadratic) trend, seasonal (annual + semi-annual), coseismic offsets, and postseismic transients using nonlinear least squares. Uses `tsmodel.m`.
+Code for fitting horizontal GPS displacement time series for secular (linear + quadratic) trend, seasonal (annual + semi-annual), coseismic offsets, and postseismic transients. The time series model is given by `tsmodel.m`. Code uses MATLAB's built-in `lsqcurvefit` nonlinear least-squares solver.
