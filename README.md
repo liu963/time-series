@@ -6,6 +6,6 @@ Code for time series analysis.
 
 Code for removing common-mode error in GPS time series. Common mode is error that is coherent across an entire network of GPS receivers.
 
-### `fitTS.m` Common-mode error filter
+### `fitTS.m` GPS time series trend estimation
 
 Code for fitting horizontal GPS displacement time series for secular (linear + quadratic) trend, seasonal (annual + semi-annual), coseismic offsets, and postseismic transients using nonlinear least squares. Uses `tsmodel.m`.
